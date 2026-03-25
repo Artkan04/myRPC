@@ -1,2 +1,3 @@
 # http-server-client
-ЗвОС лабораторная работа http-server-client
+ЗвОС Лабораторная Работа http-server-client
+Кан А.Е, студент группы ККСО-06-22
