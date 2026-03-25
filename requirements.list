@@ -1,0 +1,5 @@
+libc6
+libc6-dev
+curl
+wget
+make
