@@ -1,18 +1,10 @@
-# Зависимости для сборки myRPC
 build-essential
 gcc
 make
 libc6
 libc6-dev
-
-# Для работы с JSON
 libjson-c-dev
-
-# Для сборки deb-пакетов
 dpkg-dev
 debhelper
-
-# Для тестирования
 curl
 wget
-EOF
