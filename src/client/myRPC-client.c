@@ -21,7 +21,7 @@ printf(" -p, --port PORT Порт сервера\n");
 printf(" -s, --stream TCP сокет\n");
 printf(" -d, --dgram UDP сокет\n");
 printf(" --help Справка\n\n");
-printf("Пример: %s -h 127.0.0.1 -p 8642 -s -c "ls"\n", prog_name);
+printf("Пример: %s -h 127.0.0.1 -p 8642 -s -c \"ls\"\n", prog_name);
 }
 
 int parse_args(int argc, char *argv[], ClientConfig *config) {
