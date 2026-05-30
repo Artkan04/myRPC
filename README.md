@@ -3,7 +3,7 @@
 ЗвОС, Ставцев Алексей Вячеславович
 Кан А.Е, студент группы ККСО-06-22
 ````
-### Компоненты системы:
+### Компоненты:
 
 * **myRPC-server** — сервер-демон для обработки клиентских запросов;
 * **myRPC-client** — консольная утилита для отправки команд на сервер;
@@ -50,96 +50,65 @@ myRPC/
 └── README.md               
 ````
 
----
-
-# Сборка проекта
-
-Для сборки всех компонентов выполните в корне проекта:
-
-```bash
-make
-```
-
----
-
-# Установка
+# Установка на сервере
 
 ```bash
 # Клонируйте репозиторий
-git clone https://github.com/Artkan04/myRPC
+git clone https://github.com/Artkan04/myRPC.git
 cd myRPC
 
-# Запустите установку от root
+# Запустите установку
 sudo bash scripts/install.sh
+
+```
+# Настройка сервера
+
+```bash
+# Добавьте пользователей в whitelist (одна строка = пользователь)
+sudo nano /etc/myRPC/users.conf
+
+Пример:
+root
+user1
+user2
+
+# Запустите сервер
+sudo systemctl start myRPC-server
 ```
 
----
+# Установка на клиенте
 
-После установки `myRPC-client` и `myRPC-server` будут доступны в `/usr/bin`.
+```bash
+# Клонируйте репозиторий
+git clone https://github.com/Artkan04/myRPC.git
+cd myRPC
 
-Логи пишутся в:
+# Установите зависимости
+sudo apt update
+sudo apt install -y build-essential gcc make
 
-```text
+# Сборка клиента
+make -C libmysyslog
+make -C src/client
+
+# Установка клиента
+sudo cp src/client/myRPC-client /usr/local/bin/
+```
+
+### Отправка запроса с клиента
+
+```bash
+# Пример
+myRPC-client -h 192.168.1.10 -p 8642 -s -c "whoami"
+myRPC-client -h 192.168.1.10 -p 8642 -s -c "ls -la /tmp"
+```
+
+# Логировние
+```bash
 /var/log/myrpc-server.log
 ```
 
----
-
-# Конфигурация
-
-Создайте папку и конфигурационные файлы:
-
-```bash
-sudo mkdir -p /etc/myRPC
-```
-
-## `/etc/myRPC/myRPC.conf`
-
-```text
-# Порт для соединения
-port = 8642
-
-# Тип сокета: stream или dgram
-socket_type = stream
-
-# Режим: daemon или console
-mode = daemon
-```
-
-## `/etc/myRPC/users.conf`
-
-```text
-# Список разрешенных пользователей (по одному в строке)
-root
-```
-
----
-
-# Пример использования
-
-## Запуск сервера
-
-```bash
-sudo myRPC-server /etc/myRPC/myRPC.conf
-```
-
-## Запуск клиента (TCP)
-
-```bash
-myRPC-client --host 127.0.0.1 --port 8642 --stream --command "ls -l /tmp"
-```
-
-## Запуск клиента (UDP)
-
-```bash
-myRPC-client --host 127.0.0.1 --port 8642 --dgram --command "whoami"
-```
-
----
-
-# Протокол (JSON)
-
-## Запрос клиента
+# Запрос клиента
 
 ```json
 {
@@ -148,7 +117,7 @@ myRPC-client --host 127.0.0.1 --port 8642 --dgram --command "whoami"
 }
 ```
 
-## Ответ сервера
+# Ответ сервера
 
 ```json
 {
@@ -172,16 +141,6 @@ myRPC-client --host 127.0.0.1 --port 8642 --dgram --command "whoami"
 | `--stream`  | Использовать TCP            |
 | `--dgram`   | Использовать UDP            |
 | `--help`    | Показать справку            |
-
----
-
-# Очистка
-
-```bash
-make clean
-```
-
-Удалит все `.o`, бинарники, временные и сборочные файлы.
 
 ---
 
