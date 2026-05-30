@@ -195,64 +195,43 @@ int check_user(const char *username, const char *users_file) {
 
 // Выполнение команды
 int execute_command(const char *command, char *output, size_t output_size) {
-    char tmp_stdout[] = "/tmp/myRPC_XXXXXX.stdout";
-    char tmp_stderr[] = "/tmp/myRPC_XXXXXX.stderr";
+    char tmp_stdout[64];
+    char tmp_stderr[64];
     
-    int fd_stdout = mkstemp(tmp_stdout);
-    int fd_stderr = mkstemp(tmp_stderr);
+    snprintf(tmp_stdout, sizeof(tmp_stdout), "/tmp/myRPC_out_%d", getpid());
+    snprintf(tmp_stderr, sizeof(tmp_stderr), "/tmp/myRPC_err_%d", getpid());
     
-    if (fd_stdout == -1 || fd_stderr == -1) {
-        write_log("ERROR", "Не удалось создать временные файлы");
-        if (fd_stdout != -1) close(fd_stdout);
-        if (fd_stderr != -1) close(fd_stderr);
-        return -1;
-    }
+    char cmd[8192];
+    snprintf(cmd, sizeof(cmd), "%s > %s 2> %s", command, tmp_stdout, tmp_stderr);
     
-    pid_t pid = fork();
-    if (pid == -1) {
-        write_log("ERROR", "Ошибка fork() для выполнения команды");
-        close(fd_stdout); close(fd_stderr);
-        unlink(tmp_stdout); unlink(tmp_stderr);
-        return -1;
-    }
-    
-    if (pid == 0) {
-        dup2(fd_stdout, STDOUT_FILENO);
-        dup2(fd_stderr, STDERR_FILENO);
-        close(fd_stdout);
-        close(fd_stderr);
-        
-        execl("/bin/sh", "sh", "-c", command, (char *)NULL);
-        exit(EXIT_FAILURE);
-    }
-    
-    int status;
-    waitpid(pid, &status, 0);
-    
-    lseek(fd_stdout, 0, SEEK_SET);
-    lseek(fd_stderr, 0, SEEK_SET);
+    int ret = system(cmd);
     
     output[0] = '\0';
     
-    if (WIFEXITED(status) && WEXITSTATUS(status) == 0) {
-        ssize_t n = read(fd_stdout, output, output_size - 1);
+    FILE *fout = fopen(tmp_stdout, "r");
+    if (fout) {
+        size_t n = fread(output, 1, output_size - 1, fout);
         if (n > 0) output[n] = '\0';
-    } else {
-        ssize_t n = read(fd_stderr, output, output_size - 1);
-        if (n > 0) {
-            output[n] = '\0';
-        } else {
-            snprintf(output, output_size, "Ошибка выполнения команды (код: %d)", 
-                    WIFEXITED(status) ? WEXITSTATUS(status) : -1);
+        fclose(fout);
+    }
+    
+    if (strlen(output) == 0) {
+        FILE *ferr = fopen(tmp_stderr, "r");
+        if (ferr) {
+            size_t n = fread(output, 1, output_size - 1, ferr);
+            if (n > 0) output[n] = '\0';
+            fclose(ferr);
         }
     }
     
-    close(fd_stdout);
-    close(fd_stderr);
+    if (strlen(output) == 0) {
+        snprintf(output, output_size, "Команда выполнена (код: %d)", WEXITSTATUS(ret));
+    }
+    
     unlink(tmp_stdout);
     unlink(tmp_stderr);
     
-    return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+    return WIFEXITED(ret) ? WEXITSTATUS(ret) : -1;
 }
 
 // Обработка клиента
