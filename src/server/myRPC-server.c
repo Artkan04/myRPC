@@ -291,7 +291,6 @@ void handle_client(int client_socket) {
     close(client_socket);
     exit(EXIT_SUCCESS);
 }
-
 int main(int argc, char *argv[]) {
     ServerConfig config;
     const char *config_path = DEFAULT_CONFIG_PATH;
@@ -329,21 +328,18 @@ int main(int argc, char *argv[]) {
     int opt = 1;
     setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
     
-    // Настраиваем адрес
     struct sockaddr_in server_addr;
     memset(&server_addr, 0, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
     server_addr.sin_port = htons(config.port);
     
-    // Привязываем сокет
     if (bind(server_socket, (struct sockaddr *)&server_addr, sizeof(server_addr)) == -1) {
         write_log("ERROR", "Ошибка привязки сокета");
         close(server_socket);
         return EXIT_FAILURE;
     }
     
-    // Слушаем соединения (только для TCP)
     if (config.socket_type == SOCK_STREAM) {
         if (listen(server_socket, MAX_CLIENTS) == -1) {
             write_log("ERROR", "Ошибка прослушивания сокета");
@@ -358,7 +354,6 @@ int main(int argc, char *argv[]) {
              config.socket_type == SOCK_STREAM ? "TCP" : "UDP");
     write_log("INFO", msg);
     
-    // Основной цикл
     while (!terminate_server) {
         if (reload_config) {
             write_log("INFO", "Перезагрузка конфигурации...");
@@ -380,6 +375,15 @@ int main(int argc, char *argv[]) {
                 if (terminate_server) break;
                 continue;
             }
+            
+            pid_t pid = fork();
+            if (pid == 0) {
+                close(server_socket);
+                handle_client(client_socket);
+                exit(EXIT_SUCCESS);
+            } else {
+                close(client_socket);
+            }
         } else {
             char udp_buffer[BUFFER_SIZE];
             ssize_t bytes = recvfrom(server_socket, udp_buffer, 
@@ -391,11 +395,17 @@ int main(int argc, char *argv[]) {
                 continue;
             }
             
+            udp_buffer[bytes] = '\0';
+            write_log("DEBUG", "Получен UDP запрос");
+            
             pid_t pid = fork();
             if (pid == 0) {
-                close(server_socket);
                 Request req;
                 if (parse_json_request(udp_buffer, &req) == 0) {
+                    snprintf(msg, sizeof(msg), "Пользователь %s запросил команду: %s", 
+                             req.username, req.command);
+                    write_log("INFO", msg);
+                    
                     if (check_user(req.username, DEFAULT_USERS_PATH)) {
                         char result[65536];
                         int code = execute_command(req.command, result, sizeof(result));
@@ -405,28 +415,25 @@ int main(int argc, char *argv[]) {
                                   (struct sockaddr *)&client_addr, client_len);
                             free(response);
                         }
+                    } else {
+                        snprintf(msg, sizeof(msg), "Доступ запрещен для пользователя: %s", req.username);
+                        write_log("WARNING", msg);
+                        char *error_resp = build_json_response(1, "Доступ запрещен");
+                        if (error_resp) {
+                            sendto(server_socket, error_resp, strlen(error_resp), 0,
+                                  (struct sockaddr *)&client_addr, client_len);
+                            free(error_resp);
+                        }
                     }
                 }
                 exit(EXIT_SUCCESS);
             }
             continue;
         }
-        
-        // Для TCP создаем дочерний процесс
-        pid_t pid = fork();
-        if (pid == 0) {
-            close(server_socket);
-            handle_client(client_socket);
-            exit(EXIT_SUCCESS);
-        } else {
-            close(client_socket);
-        }
     }
     
-    // Завершение работы
     write_log("INFO", "Завершение работы сервера...");
     
-    // Ждем завершения всех дочерних процессов
     while (waitpid((pid_t)(-1), NULL, 0) > 0);
     
     close(server_socket);
